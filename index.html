@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Foorno Ubax Supermarket System</title>
+  <title>Foorno Ubax Supermarket System - v3</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
-    body { background: #f4fbff; }
+    body { background: #f4fbff; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
     .brand { color:#0d6efd; font-weight:700; }
     .low-badge { background:#ffc107; color:#000; padding:3px 7px; border-radius:6px; font-weight:600; }
-    .card { box-shadow: 0 1px 4px rgba(13,110,253,0.06); }
+    .card { box-shadow: 0 1px 6px rgba(13,110,253,0.06); }
     .small-muted { font-size:0.85rem; color:#6c757d; }
     .table-sm td, .table-sm th { vertical-align: middle; }
     .suggestions { position: absolute; z-index:50; background:#fff; width:100%; border:1px solid #ddd; max-height:240px; overflow:auto; }
@@ -18,7 +18,16 @@
     .suggest-item:hover { background:#f1f7ff; }
     .customer-info { background:#fff; border:1px solid #e9ecef; padding:10px; border-radius:6px; margin-top:8px; }
     .muted-small { font-size:0.85rem; color:#6c757d; }
-    .btn-sm-compact { padding: .25rem .5rem; font-size: .78rem; }
+    .btn-sm-compact { padding:.25rem .5rem; font-size:.78rem; }
+    .centered { text-align:center; }
+    @media print {
+      @page { size: A5; margin: 10mm; }
+      body * { visibility: hidden; }
+      #printArea, #printArea * { visibility: visible; }
+      #printArea { position: absolute; left: 0; top: 0; width: 100%; display:flex; align-items:center; justify-content:center; }
+      #printArea .receipt { width:100%; text-align:center; font-family: Arial, sans-serif; }
+    }
+    @media (max-width:768px) { .container { padding-left:10px; padding-right:10px; } }
   </style>
 </head>
 <body>
@@ -30,7 +39,7 @@
   </nav>
 
   <div class="container py-4" id="app">
-    <!-- Login -->
+    <!-- LOGIN -->
     <div id="loginView" class="row justify-content-center">
       <div class="col-md-5">
         <div class="card shadow-sm">
@@ -47,13 +56,13 @@
               </div>
               <button class="btn btn-primary w-100">GALI</button>
             </form>
-            <p class="small-muted mt-2">Fadlan geli username & password si aad u gasho — password lama soo bandhigayo.</p>
+            <p class="small-muted mt-2">Fadlan geli username & password — password lama soo bandhigayo.</p>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Main views -->
+    <!-- MAIN -->
     <div id="mainView" style="display:none;">
       <div class="row g-3">
         <div class="col-md-3">
@@ -68,13 +77,14 @@
               <h4 id="statLow">0</h4>
             </div>
             <div class="mt-2">
-              <div class="mb-2 small-muted">Iibka maanta</div>
+              <div class="mb-2 small-muted">Iibka maanta (Paid only)</div>
               <h4 id="statToday">0.00</h4>
             </div>
             <div class="mt-3">
               <button class="btn btn-sm btn-outline-secondary w-100 mb-2" onclick="go('items')">Manage Items</button>
               <button class="btn btn-sm btn-success w-100 mb-2" onclick="go('sales')">Iib Cusub</button>
-              <button class="btn btn-sm btn-primary w-100" onclick="go('reports')">Reports</button>
+              <button class="btn btn-sm btn-primary w-100 mb-2" onclick="go('reports')">Reports</button>
+              <button class="btn btn-sm btn-danger w-100" id="logoutBtnSide" onclick="logout()">Logout</button>
             </div>
           </div>
         </div>
@@ -86,7 +96,6 @@
                 <h5>Dashboard</h5>
                 <div>
                   <span class="me-3">Admin: <b id="adminName">admin</b></span>
-                  <button class="btn btn-outline-secondary btn-sm" id="logoutBtn">Logout</button>
                 </div>
               </div>
               <p class="small-muted mt-2">Ku soo dhawow Foorno Ubax — halkaan ka maamul items, iibka iyo warbixinnada.</p>
@@ -98,7 +107,7 @@
             </div>
           </div>
 
-          <!-- Items view -->
+          <!-- ITEMS -->
           <div id="itemsView" style="display:none;">
             <div class="card p-3 mb-3 d-flex justify-content-between align-items-center">
               <h5>Maareynta Items</h5>
@@ -112,7 +121,7 @@
               <form id="addItemForm" class="row g-2">
                 <input type="hidden" id="editItemId">
                 <div class="col-md-4"><input id="itemName" class="form-control" placeholder="Magaca item" required></div>
-                <div class="col-md-2"><input id="itemPrice" class="form-control" placeholder="Qiime (USD)" type="number" step="0.01" required></div>
+                <div class="col-md-2"><input id="itemPrice" class="form-control" placeholder="Qiime" type="number" step="0.01" required></div>
                 <div class="col-md-2"><input id="itemQty" class="form-control" placeholder="Tirada" type="number" required></div>
                 <div class="col-md-2"><input id="itemLow" class="form-control" placeholder="Threshold" type="number" value="5" required></div>
                 <div class="col-md-2"><button class="btn btn-success w-100" id="saveItemBtn">Ku dar / Update</button></div>
@@ -131,13 +140,14 @@
             </div>
           </div>
 
-          <!-- Sales view -->
+          <!-- SALES -->
           <div id="salesView" style="display:none;">
             <div class="card p-3 mb-3 d-flex justify-content-between">
               <h5>Iib Cusub</h5>
               <div>
                 <button class="btn btn-outline-secondary" onclick="go('dashboard')">Dashboard</button>
                 <button class="btn btn-outline-secondary" onclick="go('items')">Items</button>
+                <button class="btn btn-outline-secondary" onclick="go('reports')">Reports</button>
               </div>
             </div>
 
@@ -147,7 +157,7 @@
                   <h6>Item-yada</h6>
                   <input id="saleSearch" class="form-control mb-2" placeholder="Raadi item...">
                   <div id="saleSuggest" class="suggestions" style="display:none;"></div>
-                  <div id="saleItemsList" style="max-height:300px; overflow:auto;"></div>
+                  <div id="saleItemsList" style="max-height:320px; overflow:auto;"></div>
                 </div>
               </div>
 
@@ -184,7 +194,7 @@
             </div>
           </div>
 
-          <!-- Reports view -->
+          <!-- REPORTS -->
           <div id="reportsView" style="display:none;">
             <div class="card p-3 mb-3 d-flex justify-content-between">
               <h5>Warbixinno</h5>
@@ -195,20 +205,40 @@
 
             <div class="row g-3">
               <div class="col-md-6">
-                <div class="card p-3">
-                  <h6>Iibka Maanta</h6>
+                <div class="card p-3 mb-3">
+                  <h6>Iibka Maanta & Guud</h6>
                   <h3 id="reportTodayTotal">0.00</h3>
                   <div class="mt-3">
                     <h6>Credit Customers</h6>
                     <ul id="reportCredits" class="list-group"></ul>
                   </div>
                 </div>
+
+                <div class="card p-3">
+                  <h6>Return (Celinta)</h6>
+                  <p class="small-muted">Geli Order ID si aad u celiso (max 24 saac gudahood)</p>
+                  <div class="d-flex gap-2">
+                    <input id="returnId" class="form-control" placeholder="Order ID (e.g. INV-4821 )">
+                    <button class="btn btn-warning" id="doReturnBtn">Process Return</button>
+                  </div>
+                  <div id="returnList" class="mt-3"></div>
+                </div>
               </div>
 
               <div class="col-md-6">
-                <div class="card p-3">
+                <div class="card p-3 mb-3">
                   <h6>Items ku dhow inay dhamaadaan</h6>
                   <ul id="reportLow" class="list-group"></ul>
+                </div>
+
+                <div class="card p-3">
+                  <h6>Iibyo & Taariikh</h6>
+                  <div style="max-height:240px; overflow:auto;">
+                    <table class="table table-sm">
+                      <thead><tr><th>ID</th><th>Date</th><th>Total</th><th>Type</th></tr></thead>
+                      <tbody id="salesTable"></tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -219,27 +249,37 @@
     </div> <!-- /mainView -->
   </div> <!-- /container -->
 
+  <!-- hidden print area -->
+  <div id="printArea" style="display:none;">
+    <div class="receipt p-3">
+      <div style="font-size:18px; font-weight:700;">Foorno Ubax Supermarket System</div>
+      <div id="printContent" style="margin-top:10px;"></div>
+      <div style="margin-top:10px; font-size:12px;" id="printFooter"></div>
+    </div>
+  </div>
+
 <script>
 /* ===========================
-   Storage helpers & init (v1 keys)
+   Storage keys & admin
    =========================== */
-const KEY_ITEMS = 'foorno_ubax_items_v1';
-const KEY_SALES = 'foorno_ubax_sales_v1';
-const KEY_CUSTOMERS = 'foorno_ubax_customers_v1';
+const KEY_ITEMS = 'foorno_ubax_items_v3';
+const KEY_SALES = 'foorno_ubax_sales_v3';
+const KEY_CUSTOMERS = 'foorno_ubax_customers_v3';
+const KEY_RETURNS = 'foorno_ubax_returns_v3';
 
-/* Admin credentials (hidden) */
 const ADMIN_USER = 'admin';
-const ADMIN_PASS = '12345'; // kept hidden on UI
+const ADMIN_PASS = '12345'; // keep as in your previous file
 
-function load(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; } }
-function save(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
-function uid(prefix='id') { return prefix + '_' + Date.now() + '_' + Math.floor(Math.random()*9000+1000); }
+function load(key){ try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e){ return []; } }
+function save(key,data){ localStorage.setItem(key, JSON.stringify(data)); }
+function uid(p='id'){ return p + '_' + Date.now() + '_' + Math.floor(Math.random()*9000+1000); }
 
 let items = load(KEY_ITEMS);
 let sales = load(KEY_SALES);
 let customers = load(KEY_CUSTOMERS);
+let returns = load(KEY_RETURNS);
 
-/* If empty first time, seed example items (optional) */
+/* seed items if empty */
 if (!items || items.length === 0) {
   items = [
     { id: uid('it'), name: 'Rice 5kg', price: 10.00, quantity: 10, low:5 },
@@ -249,29 +289,32 @@ if (!items || items.length === 0) {
   save(KEY_ITEMS, items);
 }
 
-/* ================
-   Auth & UI helpers
-   ================ */
+/* UI refs */
+const loginForm = document.getElementById('loginForm');
 const loginView = document.getElementById('loginView');
 const mainView = document.getElementById('mainView');
 const navRight = document.getElementById('nav-right');
 
-function showMain() {
+/* show main */
+function showMain(){
   loginView.style.display = 'none';
   mainView.style.display = '';
   navRight.innerHTML = `<div class="d-flex align-items-center"><small class="me-3">Admin: <b>${ADMIN_USER}</b></small></div>`;
   updateStats();
   renderLowList();
   showAlertIfLow();
+  go('dashboard');
 }
 
-function logout() {
+/* logout */
+function logout(){
   sessionStorage.removeItem('foorno_ubax_logged');
   location.reload();
 }
+document.getElementById('logoutBtnSide').addEventListener('click', logout);
 
-/* Login form */
-document.getElementById('loginForm').addEventListener('submit', function(e){
+/* login submit */
+loginForm.addEventListener('submit', function(e){
   e.preventDefault();
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value;
@@ -283,52 +326,37 @@ document.getElementById('loginForm').addEventListener('submit', function(e){
     Swal.fire('Khalad','Username ama password khalad ah','error');
   }
 });
+if (sessionStorage.getItem('foorno_ubax_logged')) showMain();
 
-/* Auto-login if session */
-if (sessionStorage.getItem('foorno_ubax_logged')) {
-  document.getElementById('adminName').innerText = ADMIN_USER;
-  showMain();
-}
-
-/* Logout btn */
-document.getElementById('logoutBtn').addEventListener('click', logout);
-
-/* ================
-   Navigation
-   ================ */
-function hideAllViews() {
+/* NAV */
+function hideAllViews(){
   document.getElementById('dashboardView').style.display = 'none';
   document.getElementById('itemsView').style.display = 'none';
   document.getElementById('salesView').style.display = 'none';
   document.getElementById('reportsView').style.display = 'none';
 }
-function go(page) {
+function go(page){
   hideAllViews();
-  if (page === 'dashboard') document.getElementById('dashboardView').style.display = '';
-  if (page === 'items') { document.getElementById('itemsView').style.display = ''; renderItemsTable(); }
-  if (page === 'sales') { document.getElementById('salesView').style.display = ''; renderSaleItemsList(); }
-  if (page === 'reports') { document.getElementById('reportsView').style.display = ''; renderReports(); }
-  // refresh data
-  if (page === 'items') renderItemsTable();
-  if (page === 'sales') renderSaleItemsList();
-  if (page === 'reports') renderReports();
+  if (page==='dashboard') document.getElementById('dashboardView').style.display = '';
+  if (page==='items') { document.getElementById('itemsView').style.display = ''; renderItemsTable(); }
+  if (page==='sales') { document.getElementById('salesView').style.display = ''; renderSaleItemsList(); }
+  if (page==='reports') { document.getElementById('reportsView').style.display = ''; renderReports(); }
 }
 
-/* ================
-   Items CRUD
-   ================ */
+/* ITEMS CRUD */
 const itemsTable = document.getElementById('itemsTable');
 const addItemForm = document.getElementById('addItemForm');
 
-function renderItemsTable(filter='') {
+function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+function renderItemsTable(filter=''){
   items = load(KEY_ITEMS);
   itemsTable.innerHTML = '';
-  const q = filter.trim().toLowerCase();
-  items.forEach(it => {
+  const q = (filter||'').trim().toLowerCase();
+  items.forEach(it=>{
     if (q && !it.name.toLowerCase().includes(q)) return;
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${escapeHtml(it.name)}</td>
+    tr.innerHTML = `<td>${escapeHtml(it.name)}</td>
       <td>${parseFloat(it.price).toFixed(2)}</td>
       <td>${parseInt(it.quantity)} ${it.quantity <= it.low ? `<span class="ms-2 low-badge">Low</span>` : ''}</td>
       <td>${parseInt(it.low)}</td>
@@ -339,16 +367,10 @@ function renderItemsTable(filter='') {
     itemsTable.appendChild(tr);
   });
 }
-
-function escapeHtml(s) {
-  return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
-}
-
 itemsTable.addEventListener('click', function(e){
   const btn = e.target.closest('button');
   if (!btn) return;
-  const act = btn.dataset.act;
-  const id = btn.dataset.id;
+  const act = btn.dataset.act, id = btn.dataset.id;
   if (act === 'edit') {
     const it = items.find(x=>x.id===id);
     if (!it) return;
@@ -359,23 +381,10 @@ itemsTable.addEventListener('click', function(e){
     document.getElementById('itemLow').value = parseInt(it.low);
     window.scrollTo({top:0, behavior:'smooth'});
   } else if (act === 'del') {
-    Swal.fire({
-      title: 'Ma hubtaa?',
-      text: 'Miyaad rabtaa inaad tirtirto itemkan?',
-      icon: 'warning', showCancelButton:true
-    }).then(res=>{
-      if (res.isConfirmed) {
-        items = items.filter(x=>x.id !== id);
-        save(KEY_ITEMS, items);
-        renderItemsTable(document.getElementById('searchItem').value || '');
-        updateStats();
-        Swal.fire('La tirtiray','Item waa la tirtiray','success');
-      }
-    });
+    Swal.fire({ title:'Ma hubtaa?', text:'Miyaad rabtaa inaad tirtirto itemkan?', icon:'warning', showCancelButton:true })
+    .then(res=>{ if (res.isConfirmed){ items = items.filter(x=>x.id!==id); save(KEY_ITEMS, items); renderItemsTable(document.getElementById('searchItem').value||''); updateStats(); Swal.fire('La tirtiray','Item waa la tirtiray','success'); }});
   }
 });
-
-/* Add/Edit */
 addItemForm.addEventListener('submit', function(e){
   e.preventDefault();
   const id = document.getElementById('editItemId').value;
@@ -386,11 +395,10 @@ addItemForm.addEventListener('submit', function(e){
   if (!name) return Swal.fire('Khalad','Fadlan geli magaca item','error');
   items = load(KEY_ITEMS);
   if (id) {
-    items = items.map(it => it.id === id ? {...it, name, price, quantity: qty, low } : it);
+    items = items.map(it => it.id===id ? {...it, name, price, quantity: qty, low} : it);
     Swal.fire('La cusbooneysiiyey','Item waa la cusbooneysiiyey','success');
   } else {
-    const newItem = { id: uid('it'), name, price, quantity: qty, low };
-    items.push(newItem);
+    items.push({ id: uid('it'), name, price, quantity: qty, low });
     Swal.fire('La daray','Item cusub waa la daray','success');
   }
   save(KEY_ITEMS, items);
@@ -399,39 +407,22 @@ addItemForm.addEventListener('submit', function(e){
   renderItemsTable();
   updateStats();
 });
+document.getElementById('searchItem').addEventListener('input', function(){ renderItemsTable(this.value); });
+document.getElementById('showAddItemBtn').addEventListener('click', function(){ document.getElementById('editItemId').value=''; addItemForm.reset(); window.scrollTo({top:0, behavior:'smooth'}); });
 
-/* Search */
-document.getElementById('searchItem').addEventListener('input', function(){
-  renderItemsTable(this.value);
-});
-
-/* show add item btn */
-document.getElementById('showAddItemBtn').addEventListener('click', function(){
-  document.getElementById('editItemId').value = '';
-  addItemForm.reset();
-  window.scrollTo({top:0, behavior:'smooth'});
-});
-
-/* ================
-   Sales (cart) + Autocomplete (items) + Customer credit autocomplete & history
-   ================ */
+/* SALES + CART + SUGGEST */
 let cart = [];
 const saleSearch = document.getElementById('saleSearch');
 const saleSuggest = document.getElementById('saleSuggest');
 
-function renderSaleItemsList() {
+function renderSaleItemsList(){
   items = load(KEY_ITEMS);
   const container = document.getElementById('saleItemsList');
   container.innerHTML = '';
-  items.forEach(it => {
+  items.forEach(it=>{
     const div = document.createElement('div');
     div.className = 'd-flex align-items-center justify-content-between p-2 border-bottom';
-    div.innerHTML = `
-      <div>
-        <strong>${escapeHtml(it.name)}</strong><br>
-        <small>${parseFloat(it.price).toFixed(2)} USD — Qty: ${it.quantity}</small>
-        ${it.quantity <= it.low ? ` <span class="low-badge ms-2">Low</span>` : ''}
-      </div>
+    div.innerHTML = `<div><strong>${escapeHtml(it.name)}</strong><br><small>${parseFloat(it.price).toFixed(2)} USD — Qty: ${it.quantity}</small> ${it.quantity <= it.low ? ' <span class="low-badge ms-2">Low</span>' : ''}</div>
       <div style="min-width:140px">
         <input type="number" value="1" min="1" max="${it.quantity}" class="form-control form-control-sm mb-1 addQty" data-id="${it.id}">
         <button class="btn btn-sm btn-primary w-100 addToCart" data-id="${it.id}">Add</button>
@@ -441,8 +432,6 @@ function renderSaleItemsList() {
   saleSearch.value = '';
   hideSuggest();
 }
-
-/* add to cart from items list */
 document.getElementById('saleItemsList').addEventListener('click', function(e){
   const btn = e.target.closest('button.addToCart');
   if (!btn) return;
@@ -452,53 +441,43 @@ document.getElementById('saleItemsList').addEventListener('click', function(e){
   const it = items.find(x=>x.id===id);
   if (!it) return Swal.fire('Error','Item lama helin','error');
   if (q > it.quantity) return Swal.fire('Error',`Kaliya ${it.quantity} ayaa la heli karaa`,`error`);
-  addToCart(id, q);
+  addToCart(id,q);
 });
-
-/* search inside sale items + autocomplete suggestions */
 saleSearch.addEventListener('input', function(){
   const q = this.value.trim().toLowerCase();
   if (!q) { renderSaleItemsList(); hideSuggest(); return; }
-  // suggestions from items names & render small list
   items = load(KEY_ITEMS);
-  const matches = items.filter(it => it.name.toLowerCase().includes(q));
-  if (matches.length === 0) { hideSuggest(); renderSaleItemsList(); return; }
+  const matches = items.filter(it=> it.name.toLowerCase().includes(q));
+  if (matches.length===0) { hideSuggest(); renderSaleItemsList(); return; }
   saleSuggest.innerHTML = '';
-  matches.forEach(m => {
-    const d = document.createElement('div');
-    d.className = 'suggest-item';
+  matches.forEach(m=>{
+    const d = document.createElement('div'); d.className='suggest-item';
     d.innerHTML = `<strong>${escapeHtml(m.name)}</strong> — ${parseFloat(m.price).toFixed(2)} USD — Qty: ${m.quantity}`;
     d.dataset.id = m.id;
-    d.addEventListener('click', function(){ addToCart(this.dataset.id, 1); hideSuggest(); saleSearch.value = ''; });
+    d.addEventListener('click', function(){ addToCart(this.dataset.id,1); hideSuggest(); saleSearch.value=''; });
     saleSuggest.appendChild(d);
   });
   saleSuggest.style.display = 'block';
 });
+function hideSuggest(){ saleSuggest.style.display = 'none'; saleSuggest.innerHTML=''; }
 
-function hideSuggest(){ saleSuggest.style.display = 'none'; saleSuggest.innerHTML = ''; }
-
-/* Cart functions */
-function addToCart(id, q=1) {
+/* CART functions */
+function addToCart(id,q=1){
+  items = load(KEY_ITEMS);
   const it = items.find(x=>x.id===id);
   if (!it) return;
   const found = cart.find(x=>x.id===id);
-  if (found) {
-    found.qty += q;
-    if (found.qty > it.quantity) found.qty = it.quantity;
-  } else {
-    cart.push({ id: it.id, name: it.name, price: it.price, qty: q });
-  }
+  if (found) { found.qty += q; if (found.qty > it.quantity) found.qty = it.quantity; }
+  else cart.push({ id: it.id, name: it.name, price: it.price, qty: q });
   renderCart();
 }
-
-function renderCart() {
+function renderCart(){
   const area = document.getElementById('cartArea');
-  if (cart.length === 0) { area.innerHTML = '<p class="text-muted">Cart waa madhan yahay.</p>'; return; }
+  if (cart.length===0) { area.innerHTML = '<p class="text-muted">Cart waa madhan yahay.</p>'; return; }
   let html = `<table class="table table-sm"><thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Subtotal</th><th></th></tr></thead><tbody>`;
   let total = 0;
-  cart.forEach((c, idx) => {
-    const sub = c.qty * parseFloat(c.price);
-    total += sub;
+  cart.forEach((c,idx)=>{
+    const sub = c.qty * parseFloat(c.price); total += sub;
     html += `<tr>
       <td>${escapeHtml(c.name)}</td>
       <td><input type="number" min="1" value="${c.qty}" class="form-control form-control-sm cartQty" data-i="${idx}" style="width:90px"></td>
@@ -510,39 +489,24 @@ function renderCart() {
   html += `</tbody></table><div class="text-end"><h5>Total: <span id="cartTotal">${total.toFixed(2)}</span> USD</h5></div>`;
   area.innerHTML = html;
 }
-
-/* delegate cart events */
 document.getElementById('cartArea').addEventListener('click', function(e){
-  const btn = e.target.closest('button.removeLine');
-  if (btn) {
-    const i = parseInt(btn.dataset.i);
-    cart.splice(i,1);
-    renderCart();
-    return;
-  }
+  const btn = e.target.closest('button.removeLine'); if (btn){ const i=parseInt(btn.dataset.i); cart.splice(i,1); renderCart(); return; }
 });
 document.getElementById('cartArea').addEventListener('change', function(e){
-  const inp = e.target.closest('input.cartQty');
-  if (!inp) return;
-  const i = parseInt(inp.dataset.i);
-  let v = parseInt(inp.value) || 1;
-  const it = items.find(x=>x.id === cart[i].id);
+  const inp = e.target.closest('input.cartQty'); if (!inp) return;
+  const i = parseInt(inp.dataset.i); let v = parseInt(inp.value) || 1;
+  const it = items.find(x=>x.id===cart[i].id);
   if (v > it.quantity) { Swal.fire('Error','Qty exceeds available stock','error'); inp.value = cart[i].qty; return; }
-  cart[i].qty = v;
-  renderCart();
+  cart[i].qty = v; renderCart();
 });
 
-/* payment type toggle and credit name behavior */
+/* payment toggle */
 document.getElementById('paymentType').addEventListener('change', function(){
-  const v = this.value;
-  const creditName = document.getElementById('creditName');
-  creditName.style.display = v === 'Credit' ? '' : 'none';
-  if (v !== 'Credit') hideCreditInfo();
+  const v=this.value; const creditName = document.getElementById('creditName'); creditName.style.display = v==='Credit' ? '' : 'none';
+  if (v!=='Credit') hideCreditInfo();
 });
 
-/* ================
-   Customer autocomplete & history
-   ================ */
+/* CUSTOMERS autocomplete & history */
 const creditInput = document.getElementById('creditName');
 const creditSuggest = document.getElementById('creditSuggest');
 const creditInfo = document.getElementById('creditInfo');
@@ -551,83 +515,44 @@ const creditInfoBalance = document.getElementById('creditInfoBalance');
 const creditHistory = document.getElementById('creditHistory');
 const payBalanceBtn = document.getElementById('payBalanceBtn');
 
-function refreshCustomers() { customers = load(KEY_CUSTOMERS); }
-
+function refreshCustomers(){ customers = load(KEY_CUSTOMERS); }
 creditInput.addEventListener('input', function(){
   const q = this.value.trim().toLowerCase();
   if (!q) { hideCreditSuggest(); hideCreditInfo(); return; }
   refreshCustomers();
-  const matches = customers.filter(c => c.name.toLowerCase().includes(q));
-  if (matches.length === 0) { hideCreditSuggest(); hideCreditInfo(); return; }
-  creditSuggest.innerHTML = '';
-  matches.forEach(m => {
-    const d = document.createElement('div');
-    d.className = 'suggest-item';
-    d.innerHTML = `${escapeHtml(m.name)} — Balance: ${parseFloat(m.balance).toFixed(2)}`;
-    d.dataset.id = m.id;
-    d.addEventListener('click', function(){
-      // fill input with chosen customer name and show info
-      creditInput.value = m.name;
-      hideCreditSuggest();
-      showCreditInfoById(m.id);
-    });
+  const matches = customers.filter(c=> c.name.toLowerCase().includes(q));
+  if (matches.length===0) { hideCreditSuggest(); hideCreditInfo(); return; }
+  creditSuggest.innerHTML=''; matches.forEach(m=>{
+    const d=document.createElement('div'); d.className='suggest-item';
+    d.innerHTML = `${escapeHtml(m.name)} — Balance: ${parseFloat(m.balance).toFixed(2)}`; d.dataset.id=m.id;
+    d.addEventListener('click', function(){ creditInput.value = m.name; hideCreditSuggest(); showCreditInfoById(m.id); });
     creditSuggest.appendChild(d);
   });
-  creditSuggest.style.display = 'block';
+  creditSuggest.style.display='block';
 });
-
-function hideCreditSuggest(){ creditSuggest.style.display = 'none'; creditSuggest.innerHTML = ''; }
-
-function showCreditInfoById(cid) {
-  refreshCustomers();
-  const c = customers.find(x => x.id === cid);
-  if (!c) return hideCreditInfo();
-  // show details
-  creditInfo.style.display = 'block';
-  creditInfoName.innerText = c.name;
-  creditInfoBalance.innerText = parseFloat(c.balance).toFixed(2);
-  // purchase history: search sales records for this customer
-  const history = (load(KEY_SALES) || []).filter(s => s.customer && s.customer.toLowerCase() === c.name.toLowerCase());
-  creditHistory.innerHTML = '';
-  if (history.length === 0) creditHistory.innerHTML = '<li class="text-muted">Ma jiraan iibyo hore</li>';
+function hideCreditSuggest(){ creditSuggest.style.display='none'; creditSuggest.innerHTML=''; }
+function showCreditInfoById(cid){
+  refreshCustomers(); const c = customers.find(x=>x.id===cid); if (!c) return hideCreditInfo();
+  creditInfo.style.display='block'; creditInfoName.innerText = c.name; creditInfoBalance.innerText = parseFloat(c.balance).toFixed(2);
+  const history = (load(KEY_SALES)||[]).filter(s=> s.customer && s.customer.toLowerCase() === c.name.toLowerCase());
+  creditHistory.innerHTML=''; if (history.length===0) creditHistory.innerHTML = '<li class="text-muted">Ma jiraan iibyo hore</li>';
   else {
-    // list last items names (flatten lines) - remove duplicates, recent first
-    const itemsBought = [];
-    history.slice().reverse().forEach(s => {
-      s.lines.forEach(l => itemsBought.push(`${l.name} x${l.qty}`));
-    });
+    const itemsBought = []; history.slice().reverse().forEach(s=> s.lines.forEach(l=> itemsBought.push(`${l.name} x${l.qty}`)));
     const uniqueItems = Array.from(new Set(itemsBought)).slice(0,20);
     uniqueItems.forEach(it => creditHistory.innerHTML += `<li>${escapeHtml(it)}</li>`);
   }
 }
+function showCreditInfoByName(name){ refreshCustomers(); const c = customers.find(x=> x.name.toLowerCase()===name.toLowerCase()); if (!c) return hideCreditInfo(); showCreditInfoById(c.id); }
+function hideCreditInfo(){ creditInfo.style.display='none'; creditInfoName.innerText=''; creditInfoBalance.innerText='0.00'; creditHistory.innerHTML=''; }
 
-function showCreditInfoByName(name) {
-  refreshCustomers();
-  const c = customers.find(x => x.name.toLowerCase() === name.toLowerCase());
-  if (!c) return hideCreditInfo();
-  showCreditInfoById(c.id);
-}
-
-function hideCreditInfo() {
-  creditInfo.style.display = 'none';
-  creditInfoName.innerText = '';
-  creditInfoBalance.innerText = '0.00';
-  creditHistory.innerHTML = '';
-}
-
-/* Pay balance button (from sales view) */
+/* Pay balance */
 payBalanceBtn.addEventListener('click', function(){
-  const name = creditInput.value.trim();
-  if (!name) return Swal.fire('Error','Fadlan dooro ama geli magaca macaamiisha','error');
-  refreshCustomers();
-  const c = customers.find(x => x.name.toLowerCase() === name.toLowerCase());
-  if (!c) return Swal.fire('Error','Macaamiilkan lama helin','error');
-  // prompt amount and admin password
+  const name = creditInput.value.trim(); if (!name) return Swal.fire('Error','Fadlan dooro ama geli magaca macaamiisha','error');
+  refreshCustomers(); const c = customers.find(x=> x.name.toLowerCase()===name.toLowerCase()); if (!c) return Swal.fire('Error','Macaamiilkan lama helin','error');
   Swal.fire({
     title: `Bixin balance: ${c.name}`,
     html: `<input id="sw-amount" type="number" class="swal2-input" placeholder="Lacag (USD)" min="0.01" step="0.01"><input id="sw-pass" type="password" class="swal2-input" placeholder="Geli admin password">`,
-    showCancelButton: true,
-    confirmButtonText: 'Bixi',
+    showCancelButton:true, confirmButtonText:'Bixi',
     preConfirm: () => {
       const amount = parseFloat(document.getElementById('sw-amount').value);
       const pass = document.getElementById('sw-pass').value;
@@ -637,123 +562,136 @@ payBalanceBtn.addEventListener('click', function(){
       if (pass !== ADMIN_PASS) { Swal.showValidationMessage('Password khalad ah'); return false; }
       return { amount, pass };
     }
-  }).then(result => {
+  }).then(result=>{
     if (result.isConfirmed && result.value) {
       const { amount } = result.value;
       customers = load(KEY_CUSTOMERS);
-      const cc = customers.find(x => x.id === c.id);
+      const cc = customers.find(x=> x.id===c.id);
       cc.balance = parseFloat((parseFloat(cc.balance) - amount).toFixed(2));
       if (cc.balance < 0.005) cc.balance = 0;
       save(KEY_CUSTOMERS, customers);
-      // record payment in sales as a Payment entry for history
+      // record payment entry (as Payment) - Payment shouldn't count as sale
       const salesLocal = load(KEY_SALES);
-      salesLocal.push({ id: uid('p'), type: 'Payment', customer: cc.name, amount: amount, date: new Date().toISOString(), lines: [] });
+      salesLocal.push({ id: uid('p'), type:'Payment', customer: cc.name, amount, date: new Date().toISOString(), lines: [], returned: false });
       save(KEY_SALES, salesLocal);
-      showCreditInfoById(cc.id);
-      renderReports();
-      updateStats();
+      showCreditInfoById(cc.id); renderReports(); updateStats();
       Swal.fire('La bixiyey','Lacagta waa la xaqiijiyey','success');
     }
   });
 });
 
-/* ================
-   Save sale (unchanged logic) but with customer-info refresh
-   ================ */
+/* helper: generate short invoice id */
+function genInvoice(){
+  // INV- + 4 digit random
+  const n = Math.floor(Math.random()*9000)+1000;
+  return 'INV-' + n;
+}
+
+/* SAVE SALE + Auto print A5 */
 document.getElementById('saveSaleBtn').addEventListener('click', function(){
-  if (cart.length === 0) return Swal.fire('Error','Cart waa madhan','error');
+  if (cart.length===0) return Swal.fire('Error','Cart waa madhan','error');
   const payment = document.getElementById('paymentType').value;
   const custName = document.getElementById('creditName').value.trim();
-  if (payment === 'Credit' && !custName) return Swal.fire('Error','Fadlan gali magaca macaamiisha (credit)','error');
+  if (payment === 'Credit' && !custName) return Swal.fire('Error','Fadlan geli magaca macaamiisha (credit)','error');
 
-  // validate stock again
+  // validate stock
   items = load(KEY_ITEMS);
   try {
     cart.forEach(c => {
-      const it = items.find(x=>x.id===c.id);
+      const it = items.find(x=> x.id===c.id);
       if (!it) throw new Error(`Item ${c.name} lama helin`);
       if (c.qty > it.quantity) throw new Error(`Item '${it.name}' kaliya ${it.quantity} ayaa la heli karaa, codsatay ${c.qty}`);
     });
-  } catch(err) { return Swal.fire('Error', err.message, 'error'); }
+  } catch(err){ return Swal.fire('Error', err.message, 'error'); }
 
   // compute total
-  let total = 0;
-  cart.forEach(c => total += c.qty * parseFloat(c.price));
-  total = parseFloat(total.toFixed(2));
+  let total = 0; cart.forEach(c => total += c.qty * parseFloat(c.price)); total = parseFloat(total.toFixed(2));
 
-  // create sale entry
-  const sale = { id: uid('s'), total, payment, customer: payment==='Credit' ? custName : null, date: new Date().toISOString(), lines: cart.map(c=>({...c})) };
-  sales = load(KEY_SALES);
-  sales.push(sale);
-  save(KEY_SALES, sales);
+  // sale entry
+  const orderId = genInvoice();
+  const sale = { id: orderId, total, payment, customer: payment==='Credit'? custName : null, date: new Date().toISOString(), lines: cart.map(c => ({...c})), returned: false };
+  sales = load(KEY_SALES); sales.push(sale); save(KEY_SALES, sales);
 
   // decrement stock
-  items = items.map(it => {
-    const line = cart.find(l => l.id === it.id);
-    if (line) {
-      return {...it, quantity: it.quantity - line.qty};
-    }
-    return it;
-  });
+  items = items.map(it => { const line = cart.find(l=> l.id===it.id); if (line) return {...it, quantity: it.quantity - line.qty}; return it; });
   save(KEY_ITEMS, items);
 
-  // handle credit customer
+  // handle credit customer: update balance but do NOT include in today's paid total
   if (payment === 'Credit') {
     customers = load(KEY_CUSTOMERS);
     let c = customers.find(x => x.name.toLowerCase() === custName.toLowerCase());
     if (c) c.balance = parseFloat((parseFloat(c.balance) + total).toFixed(2));
-    else {
-      c = { id: uid('c'), name: custName, balance: total };
-      customers.push(c);
-    }
+    else { c = { id: uid('c'), name: custName, balance: total }; customers.push(c); }
     save(KEY_CUSTOMERS, customers);
   }
 
-  // clear cart
-  cart = [];
-  renderCart();
-  renderSaleItemsList();
-  renderItemsTable();
-  updateStats();
-  showAlertIfLow();
+  // prepare receipt content
+  const dt = new Date(sale.date || new Date().toISOString());
+  const dtStr = dt.toLocaleString();
+  let receiptHtml = `<div style="font-weight:700; font-size:16px;">Foorno Ubax Supermarket System</div>`;
+  receiptHtml += `<div style="margin-top:6px;">Order ID: <b>${orderId}</b></div>`;
+  receiptHtml += `<div>Date: ${dtStr}</div>`;
+  if (sale.customer) receiptHtml += `<div>Customer: ${escapeHtml(sale.customer)}</div>`;
+  receiptHtml += `<hr style="margin:8px 0;">`;
+  receiptHtml += `<table style="width:100%; font-size:14px;" cellpadding="4"><tbody>`;
+  sale.lines.forEach(l => {
+    receiptHtml += `<tr><td style="text-align:left">${escapeHtml(l.name)} x${l.qty}</td><td style="text-align:right">${(l.qty*parseFloat(l.price)).toFixed(2)} USD</td></tr>`;
+  });
+  receiptHtml += `</tbody></table>`;
+  receiptHtml += `<hr style="margin:8px 0;"><div style="font-weight:700; font-size:15px;">Total: ${sale.total.toFixed(2)} USD</div>`;
+  receiptHtml += `<div style="margin-top:6px;">Type: ${sale.payment}</div>`;
+  receiptHtml += `<div style="margin-top:10px; font-size:12px;">Thanks for shopping at Foorno Ubax</div>`;
 
-  // if credit sale, refresh credit info box
-  if (payment === 'Credit') {
-    showCreditInfoByName(custName);
-  }
+  // clear cart & UI
+  cart = []; renderCart(); renderSaleItemsList(); renderItemsTable(); updateStats(); showAlertIfLow();
 
-  Swal.fire('Saved','Iibka waa la keydiyey','success');
+  // save and auto-print
+  document.getElementById('printContent').innerHTML = `<div class="centered">${receiptHtml}</div>`;
+  document.getElementById('printFooter').innerText = `Order ID: ${orderId} • ${dtStr}`;
+  const printArea = document.getElementById('printArea');
+  printArea.style.display = 'block';
+  setTimeout(()=>{
+    window.print();
+    printArea.style.display = 'none';
+  }, 400);
+
+  // if credit sale refresh credit info box
+  if (sale.payment === 'Credit') showCreditInfoByName(sale.customer);
+
+  Swal.fire('Saved','Iibka waa la keydiyey. Receipt waa la daabacay.','success');
 });
 
-/* ================
-   Reports & stats + Pay (reports)
-   ================ */
+/* REPORTS & RETURNS */
 function updateStats(){
-  items = load(KEY_ITEMS);
-  sales = load(KEY_SALES);
-  customers = load(KEY_CUSTOMERS);
+  items = load(KEY_ITEMS); sales = load(KEY_SALES); customers = load(KEY_CUSTOMERS); returns = load(KEY_RETURNS);
   document.getElementById('statItems').innerText = items.length;
   const lowCount = items.filter(i => i.quantity <= i.low).length;
   document.getElementById('statLow').innerText = lowCount;
-  // today's sales
+  // today total: include only Paid sales, exclude Credit and exclude Payments and exclude returned
   const today = new Date().toISOString().slice(0,10);
-  const todayTotal = (sales.filter(s => s.date.slice(0,10) === today).reduce((a,b)=> a + parseFloat(b.total || 0), 0) || 0).toFixed(2);
+  const todayTotal = (sales.filter(s => {
+    const sday = (s.date||'').slice(0,10);
+    if (sday !== today) return false;
+    if (s.returned) return false;
+    if (!s.payment) return false;
+    if (s.payment === 'Paid') return true;
+    return false; // exclude Credit and Payment types
+  }).reduce((a,b)=> a + parseFloat(b.total || 0), 0) || 0).toFixed(2);
   document.getElementById('statToday').innerText = todayTotal;
 }
-
 function renderLowList(){
-  const lowList = items.filter(i => i.quantity <= i.low);
+  items = load(KEY_ITEMS);
+  const low = items.filter(i => i.quantity <= i.low);
   const container = document.getElementById('lowItemsList');
-  if (lowList.length === 0) container.innerHTML = '<p class="text-muted">Items wanaagsan — ma jiraan wax ku dhow inay dhamaadaan.</p>';
+  if (low.length === 0) container.innerHTML = '<p class="text-muted">Items wanaagsan — ma jiraan wax ku dhow inay dhamaadaan.</p>';
   else {
     let html = '<ul class="list-group">';
-    lowList.forEach(i => html += `<li class="list-group-item d-flex justify-content-between">${escapeHtml(i.name)} <span class="text-danger">${i.quantity}</span></li>`);
-    html += '</ul>';
-    container.innerHTML = html;
+    low.forEach(i => html += `<li class="list-group-item d-flex justify-content-between">${escapeHtml(i.name)} <span class="text-danger">${i.quantity}</span></li>`);
+    html += '</ul>'; container.innerHTML = html;
   }
 }
-
-function showAlertIfLow() {
+function showAlertIfLow(){
+  items = load(KEY_ITEMS);
   const low = items.filter(i => i.quantity <= i.low);
   if (low.length > 0) {
     const names = low.map(i => `${i.name} (${i.quantity})`).join(', ');
@@ -761,42 +699,127 @@ function showAlertIfLow() {
   }
 }
 
+/* render reports */
 function renderReports(){
-  sales = load(KEY_SALES);
-  customers = load(KEY_CUSTOMERS);
-  items = load(KEY_ITEMS);
-  // today total
+  sales = load(KEY_SALES); customers = load(KEY_CUSTOMERS); returns = load(KEY_RETURNS); items = load(KEY_ITEMS);
+  // report today's total (Paid only)
   const today = new Date().toISOString().slice(0,10);
-  const todayTotal = (sales.filter(s=>s.date.slice(0,10)===today).reduce((a,b)=> a + parseFloat(b.total || 0), 0) || 0).toFixed(2);
+  const todayTotal = (sales.filter(s => {
+    const sday = (s.date||'').slice(0,10);
+    if (sday !== today) return false;
+    if (s.returned) return false;
+    if (s.payment === 'Paid') return true;
+    return false;
+  }).reduce((a,b)=> a + parseFloat(b.total || 0), 0) || 0).toFixed(2);
   document.getElementById('reportTodayTotal').innerText = todayTotal;
-  // credits
+
+  // report credits
   const rc = document.getElementById('reportCredits'); rc.innerHTML = '';
-  if (customers.length === 0) rc.innerHTML = '<li class="list-group-item text-muted">Ma jiraan credit customers</li>';
+  if (!customers || customers.length===0) rc.innerHTML = '<li class="list-group-item text-muted">Ma jiraan credit customers</li>';
   else customers.forEach(c => rc.innerHTML += `<li class="list-group-item d-flex justify-content-between">${escapeHtml(c.name)} <span>${parseFloat(c.balance).toFixed(2)}</span></li>`);
   // low items
   const rl = document.getElementById('reportLow'); rl.innerHTML = '';
   const lowList = items.filter(i => i.quantity <= i.low);
   if (lowList.length === 0) rl.innerHTML = '<li class="list-group-item text-muted">Ma jiraan items ku dhow inay dhamaadaan</li>';
   else lowList.forEach(i => rl.innerHTML += `<li class="list-group-item d-flex justify-content-between">${escapeHtml(i.name)} <span>${i.quantity}</span></li>`);
+
+  // sales list
+  const st = document.getElementById('salesTable'); st.innerHTML = '';
+  (sales || []).slice().reverse().forEach(s => {
+    const dt = s.date ? new Date(s.date).toLocaleString() : '';
+    st.innerHTML += `<tr class="${s.returned ? 'table-warning' : ''}"><td>${escapeHtml(s.id)}</td><td>${dt}</td><td>${parseFloat(s.total||0).toFixed(2)}</td><td>${escapeHtml(s.payment||s.type||'')}</td></tr>`;
+  });
+
+  // returns list
+  const rlContainer = document.getElementById('returnList'); rlContainer.innerHTML = '';
+  if (!returns || returns.length===0) rlContainer.innerHTML = '<p class="text-muted">Ma jiraan returns la diiwaangeliyey.</p>';
+  else {
+    let html = '<ul class="list-group">';
+    returns.slice().reverse().forEach(r => {
+      const dt = r.date ? new Date(r.date).toLocaleString() : '';
+      html += `<li class="list-group-item d-flex justify-content-between"><div><b>${escapeHtml(r.orderId)}</b> — ${dt}<br><small>${escapeHtml(r.note||'')}</small></div><div><span class="text-success">Returned</span></div></li>`;
+    });
+    html += '</ul>'; rlContainer.innerHTML = html;
+  }
 }
 
-/* initial render */
-renderItemsTable();
-renderSaleItemsList();
-updateStats();
+/* process return: single sale return (user requested single-item or full order?). User selected earlier => full order return */
+document.getElementById('doReturnBtn').addEventListener('click', function(){
+  const id = document.getElementById('returnId').value.trim();
+  if (!id) return Swal.fire('Error','Fadlan geli Order ID','error');
+  sales = load(KEY_SALES);
+  const saleIndex = sales.findIndex(s => s.id === id);
+  if (saleIndex === -1) return Swal.fire('Error','Order ID lama helin','error');
+  const sale = sales[saleIndex];
+  if (sale.returned) return Swal.fire('Info','Iibkan hore ayaa loo celiyey','info');
+  const saleDate = new Date(sale.date);
+  const now = new Date();
+  const diffMs = now - saleDate;
+  const diffHours = diffMs / (1000*60*60);
+  if (diffHours > 24) return Swal.fire('Diid','⚠️ Waqtiga celinta wuu dhammaaday (24 saac)','error');
 
-/* if user navigates to views (after login) keep dashboard visible by default */
-if (sessionStorage.getItem('foorno_ubax_logged')) {
-  go('dashboard');
-} else {
-  hideAllViews();
+  // restore stock quantities (full order return)
+  items = load(KEY_ITEMS);
+  sale.lines.forEach(line => {
+    const it = items.find(x=> x.id === line.id);
+    if (it) it.quantity = parseInt(it.quantity) + parseInt(line.qty);
+  });
+  save(KEY_ITEMS, items);
+
+  // mark sale returned
+  sales[saleIndex].returned = true;
+  save(KEY_SALES, sales);
+
+  // register return entry
+  returns = load(KEY_RETURNS) || [];
+  returns.push({ id: uid('r'), orderId: sale.id, date: new Date().toISOString(), note: 'Returned within 24 hours' });
+  save(KEY_RETURNS, returns);
+
+  // update customers balance if credit
+  if (sale.payment === 'Credit' && sale.customer) {
+    customers = load(KEY_CUSTOMERS);
+    const c = customers.find(x=> x.name.toLowerCase() === sale.customer.toLowerCase());
+    if (c) {
+      c.balance = parseFloat((parseFloat(c.balance) - parseFloat(sale.total)).toFixed(2));
+      if (c.balance < 0.005) c.balance = 0;
+      save(KEY_CUSTOMERS, customers);
+    }
+  }
+
+  renderItemsTable(); renderSaleItemsList(); updateStats(); renderReports();
+  Swal.fire('La xaqiijiyey','Return waa la sameeyey. Stock & records waa la cusbooneysiiyey','success');
+});
+
+/* initial renders */
+renderItemsTable(); renderSaleItemsList(); updateStats(); renderReports();
+if (sessionStorage.getItem('foorno_ubax_logged')) go('dashboard'); else hideAllViews();
+
+/* Minimal export/import backup (kept simple) */
+function exportData(){
+  const data = { items: load(KEY_ITEMS), sales: load(KEY_SALES), customers: load(KEY_CUSTOMERS), returns: load(KEY_RETURNS) };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'foorno_ubax_backup_v3.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+function importData(json){
+  try {
+    const d = JSON.parse(json);
+    if (d.items) save(KEY_ITEMS, d.items);
+    if (d.sales) save(KEY_SALES, d.sales);
+    if (d.customers) save(KEY_CUSTOMERS, d.customers);
+    if (d.returns) save(KEY_RETURNS, d.returns);
+    items = load(KEY_ITEMS); sales = load(KEY_SALES); customers = load(KEY_CUSTOMERS); returns = load(KEY_RETURNS);
+    renderItemsTable(); renderSaleItemsList(); updateStats(); renderReports();
+    Swal.fire('Imported','Data waa la soo dejiyey','success');
+  } catch(e) { Swal.fire('Error','Import failed: invalid file','error'); }
 }
 
-/* ================
-   Utility (kept minimal)
-   ================ */
-document.getElementById('nav-right').insertAdjacentHTML('beforeend', '');
+/* helpers to hide suggestions when clicking outside */
+document.addEventListener('click', function(e){
+  if (!e.target.closest('.suggestions') && !e.target.closest('#saleSearch')) hideSuggest();
+  if (!e.target.closest('.suggestions') && !e.target.closest('#creditName')) hideCreditSuggest();
+});
 </script>
-
 </body>
 </html>

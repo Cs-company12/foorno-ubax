@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Foorno Ubax Supermarket System - v3</title>
+  <title>Foorno Ubax Supermarket System - v3 (Barcode Integrated)</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   <style>
     body { background: #f4fbff; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
     .brand { color:#0d6efd; font-weight:700; }
@@ -20,6 +21,7 @@
     .muted-small { font-size:0.85rem; color:#6c757d; }
     .btn-sm-compact { padding:.25rem .5rem; font-size:.78rem; }
     .centered { text-align:center; }
+    .nav-small { font-size:0.9rem; }
     @media print {
       @page { size: A5; margin: 10mm; }
       body * { visibility: hidden; }
@@ -32,9 +34,9 @@
 </head>
 <body>
   <nav class="navbar navbar-light bg-white border-bottom">
-    <div class="container-fluid">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
       <span class="navbar-brand brand">Foorno Ubax Supermarket System</span>
-      <div id="nav-right"></div>
+      <div id="nav-right" class="nav-small"></div>
     </div>
   </nav>
 
@@ -80,16 +82,19 @@
               <div class="mb-2 small-muted">Iibka maanta (Paid only)</div>
               <h4 id="statToday">0.00</h4>
             </div>
-            <div class="mt-3">
-              <button class="btn btn-sm btn-outline-secondary w-100 mb-2" onclick="go('items')">Manage Items</button>
-              <button class="btn btn-sm btn-success w-100 mb-2" onclick="go('sales')">Iib Cusub</button>
-              <button class="btn btn-sm btn-primary w-100 mb-2" onclick="go('reports')">Reports</button>
-              <button class="btn btn-sm btn-danger w-100" id="logoutBtnSide" onclick="logout()">Logout</button>
+            <div class="mt-3 d-grid gap-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="go('dashboard')">Dashboard</button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="go('items')">Manage Items</button>
+              <button class="btn btn-sm btn-success" onclick="go('sales')">Iib Cusub</button>
+              <button class="btn btn-sm btn-primary" onclick="go('reports')">Reports</button>
+              <button class="btn btn-sm btn-warning" onclick="go('barcode')">Barcode Generator</button>
+              <button class="btn btn-sm btn-danger" id="logoutBtnSide" onclick="logout()">Logout</button>
             </div>
           </div>
         </div>
 
         <div class="col-md-9">
+          <!-- Dashboard -->
           <div id="dashboardView">
             <div class="card p-3 mb-3">
               <div class="d-flex justify-content-between align-items-center">
@@ -244,6 +249,22 @@
             </div>
           </div>
 
+          <!-- BARCODE GENERATOR VIEW -->
+          <div id="barcodeView" style="display:none;">
+            <div class="card p-3 mb-3 d-flex justify-content-between align-items-center">
+              <h5>Barcode Generator</h5>
+              <div>
+                <button class="btn btn-outline-secondary me-2" onclick="go('items')">Items</button>
+                <button class="btn btn-outline-secondary" onclick="go('sales')">Sales</button>
+              </div>
+            </div>
+
+            <div class="card p-3">
+              <h6>Daabac Barcode</h6>
+              <div id="barcodeItemsList" style="max-height:420px; overflow:auto;"></div>
+            </div>
+          </div>
+
         </div> <!-- /col-md-9 -->
       </div> <!-- /row -->
     </div> <!-- /mainView -->
@@ -258,6 +279,9 @@
     </div>
   </div>
 
+  <!-- hidden barcode scan input -->
+  <input id="barcodeScanInput" type="text" style="position:absolute; top:-120px; left:-120px; opacity:0;">
+
 <script>
 /* ===========================
    Storage keys & admin
@@ -266,9 +290,8 @@ const KEY_ITEMS = 'foorno_ubax_items_v3';
 const KEY_SALES = 'foorno_ubax_sales_v3';
 const KEY_CUSTOMERS = 'foorno_ubax_customers_v3';
 const KEY_RETURNS = 'foorno_ubax_returns_v3';
-
 const ADMIN_USER = 'admin';
-const ADMIN_PASS = '12345'; // keep as in your previous file
+const ADMIN_PASS = '12345';
 
 function load(key){ try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e){ return []; } }
 function save(key,data){ localStorage.setItem(key, JSON.stringify(data)); }
@@ -334,13 +357,15 @@ function hideAllViews(){
   document.getElementById('itemsView').style.display = 'none';
   document.getElementById('salesView').style.display = 'none';
   document.getElementById('reportsView').style.display = 'none';
+  document.getElementById('barcodeView').style.display = 'none';
 }
 function go(page){
   hideAllViews();
   if (page==='dashboard') document.getElementById('dashboardView').style.display = '';
   if (page==='items') { document.getElementById('itemsView').style.display = ''; renderItemsTable(); }
-  if (page==='sales') { document.getElementById('salesView').style.display = ''; renderSaleItemsList(); }
+  if (page==='sales') { document.getElementById('salesView').style.display = ''; renderSaleItemsList(); renderCart(); focusScanInput(); }
   if (page==='reports') { document.getElementById('reportsView').style.display = ''; renderReports(); }
+  if (page==='barcode') { document.getElementById('barcodeView').style.display = ''; renderBarcodeItems(); }
 }
 
 /* ITEMS CRUD */
@@ -362,6 +387,7 @@ function renderItemsTable(filter=''){
       <td>${parseInt(it.low)}</td>
       <td>
         <button class="btn btn-sm btn-secondary me-1" data-act="edit" data-id="${it.id}">Edit</button>
+        <button class="btn btn-sm btn-outline-primary me-1" data-act="print" data-id="${it.id}">Print Barcode</button>
         <button class="btn btn-sm btn-danger" data-act="del" data-id="${it.id}">Delete</button>
       </td>`;
     itemsTable.appendChild(tr);
@@ -383,6 +409,10 @@ itemsTable.addEventListener('click', function(e){
   } else if (act === 'del') {
     Swal.fire({ title:'Ma hubtaa?', text:'Miyaad rabtaa inaad tirtirto itemkan?', icon:'warning', showCancelButton:true })
     .then(res=>{ if (res.isConfirmed){ items = items.filter(x=>x.id!==id); save(KEY_ITEMS, items); renderItemsTable(document.getElementById('searchItem').value||''); updateStats(); Swal.fire('La tirtiray','Item waa la tirtiray','success'); }});
+  } else if (act === 'print') {
+    const it = items.find(x=>x.id===id);
+    if (!it) return;
+    generateAndPrintBarcode(it);
   }
 });
 addItemForm.addEventListener('submit', function(e){
@@ -423,8 +453,8 @@ function renderSaleItemsList(){
     const div = document.createElement('div');
     div.className = 'd-flex align-items-center justify-content-between p-2 border-bottom';
     div.innerHTML = `<div><strong>${escapeHtml(it.name)}</strong><br><small>${parseFloat(it.price).toFixed(2)} USD — Qty: ${it.quantity}</small> ${it.quantity <= it.low ? ' <span class="low-badge ms-2">Low</span>' : ''}</div>
-      <div style="min-width:140px">
-        <input type="number" value="1" min="1" max="${it.quantity}" class="form-control form-control-sm mb-1 addQty" data-id="${it.id}">
+      <div style="min-width:160px">
+        <input type="number" value="1" min="1" max="${it.quantity}" class="form-control form-control-sm mb-1 addQty" data-id="${it.id}" style="width:80px; display:inline-block; margin-right:6px;">
         <button class="btn btn-sm btn-primary w-100 addToCart" data-id="${it.id}">Add</button>
       </div>`;
     container.appendChild(div);
@@ -442,384 +472,8 @@ document.getElementById('saleItemsList').addEventListener('click', function(e){
   if (!it) return Swal.fire('Error','Item lama helin','error');
   if (q > it.quantity) return Swal.fire('Error',`Kaliya ${it.quantity} ayaa la heli karaa`,`error`);
   addToCart(id,q);
+  // NOTE: barcode print is NOT triggered on Add anymore (user requested)
 });
 saleSearch.addEventListener('input', function(){
   const q = this.value.trim().toLowerCase();
-  if (!q) { renderSaleItemsList(); hideSuggest(); return; }
-  items = load(KEY_ITEMS);
-  const matches = items.filter(it=> it.name.toLowerCase().includes(q));
-  if (matches.length===0) { hideSuggest(); renderSaleItemsList(); return; }
-  saleSuggest.innerHTML = '';
-  matches.forEach(m=>{
-    const d = document.createElement('div'); d.className='suggest-item';
-    d.innerHTML = `<strong>${escapeHtml(m.name)}</strong> — ${parseFloat(m.price).toFixed(2)} USD — Qty: ${m.quantity}`;
-    d.dataset.id = m.id;
-    d.addEventListener('click', function(){ addToCart(this.dataset.id,1); hideSuggest(); saleSearch.value=''; });
-    saleSuggest.appendChild(d);
-  });
-  saleSuggest.style.display = 'block';
-});
-function hideSuggest(){ saleSuggest.style.display = 'none'; saleSuggest.innerHTML=''; }
-
-/* CART functions */
-function addToCart(id,q=1){
-  items = load(KEY_ITEMS);
-  const it = items.find(x=>x.id===id);
-  if (!it) return;
-  const found = cart.find(x=>x.id===id);
-  if (found) { found.qty += q; if (found.qty > it.quantity) found.qty = it.quantity; }
-  else cart.push({ id: it.id, name: it.name, price: it.price, qty: q });
-  renderCart();
-}
-function renderCart(){
-  const area = document.getElementById('cartArea');
-  if (cart.length===0) { area.innerHTML = '<p class="text-muted">Cart waa madhan yahay.</p>'; return; }
-  let html = `<table class="table table-sm"><thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Subtotal</th><th></th></tr></thead><tbody>`;
-  let total = 0;
-  cart.forEach((c,idx)=>{
-    const sub = c.qty * parseFloat(c.price); total += sub;
-    html += `<tr>
-      <td>${escapeHtml(c.name)}</td>
-      <td><input type="number" min="1" value="${c.qty}" class="form-control form-control-sm cartQty" data-i="${idx}" style="width:90px"></td>
-      <td>${parseFloat(c.price).toFixed(2)}</td>
-      <td>${sub.toFixed(2)}</td>
-      <td><button class="btn btn-sm btn-danger removeLine" data-i="${idx}">x</button></td>
-    </tr>`;
-  });
-  html += `</tbody></table><div class="text-end"><h5>Total: <span id="cartTotal">${total.toFixed(2)}</span> USD</h5></div>`;
-  area.innerHTML = html;
-}
-document.getElementById('cartArea').addEventListener('click', function(e){
-  const btn = e.target.closest('button.removeLine'); if (btn){ const i=parseInt(btn.dataset.i); cart.splice(i,1); renderCart(); return; }
-});
-document.getElementById('cartArea').addEventListener('change', function(e){
-  const inp = e.target.closest('input.cartQty'); if (!inp) return;
-  const i = parseInt(inp.dataset.i); let v = parseInt(inp.value) || 1;
-  const it = items.find(x=>x.id===cart[i].id);
-  if (v > it.quantity) { Swal.fire('Error','Qty exceeds available stock','error'); inp.value = cart[i].qty; return; }
-  cart[i].qty = v; renderCart();
-});
-
-/* payment toggle */
-document.getElementById('paymentType').addEventListener('change', function(){
-  const v=this.value; const creditName = document.getElementById('creditName'); creditName.style.display = v==='Credit' ? '' : 'none';
-  if (v!=='Credit') hideCreditInfo();
-});
-
-/* CUSTOMERS autocomplete & history */
-const creditInput = document.getElementById('creditName');
-const creditSuggest = document.getElementById('creditSuggest');
-const creditInfo = document.getElementById('creditInfo');
-const creditInfoName = document.getElementById('creditInfoName');
-const creditInfoBalance = document.getElementById('creditInfoBalance');
-const creditHistory = document.getElementById('creditHistory');
-const payBalanceBtn = document.getElementById('payBalanceBtn');
-
-function refreshCustomers(){ customers = load(KEY_CUSTOMERS); }
-creditInput.addEventListener('input', function(){
-  const q = this.value.trim().toLowerCase();
-  if (!q) { hideCreditSuggest(); hideCreditInfo(); return; }
-  refreshCustomers();
-  const matches = customers.filter(c=> c.name.toLowerCase().includes(q));
-  if (matches.length===0) { hideCreditSuggest(); hideCreditInfo(); return; }
-  creditSuggest.innerHTML=''; matches.forEach(m=>{
-    const d=document.createElement('div'); d.className='suggest-item';
-    d.innerHTML = `${escapeHtml(m.name)} — Balance: ${parseFloat(m.balance).toFixed(2)}`; d.dataset.id=m.id;
-    d.addEventListener('click', function(){ creditInput.value = m.name; hideCreditSuggest(); showCreditInfoById(m.id); });
-    creditSuggest.appendChild(d);
-  });
-  creditSuggest.style.display='block';
-});
-function hideCreditSuggest(){ creditSuggest.style.display='none'; creditSuggest.innerHTML=''; }
-function showCreditInfoById(cid){
-  refreshCustomers(); const c = customers.find(x=>x.id===cid); if (!c) return hideCreditInfo();
-  creditInfo.style.display='block'; creditInfoName.innerText = c.name; creditInfoBalance.innerText = parseFloat(c.balance).toFixed(2);
-  const history = (load(KEY_SALES)||[]).filter(s=> s.customer && s.customer.toLowerCase() === c.name.toLowerCase());
-  creditHistory.innerHTML=''; if (history.length===0) creditHistory.innerHTML = '<li class="text-muted">Ma jiraan iibyo hore</li>';
-  else {
-    const itemsBought = []; history.slice().reverse().forEach(s=> s.lines.forEach(l=> itemsBought.push(`${l.name} x${l.qty}`)));
-    const uniqueItems = Array.from(new Set(itemsBought)).slice(0,20);
-    uniqueItems.forEach(it => creditHistory.innerHTML += `<li>${escapeHtml(it)}</li>`);
-  }
-}
-function showCreditInfoByName(name){ refreshCustomers(); const c = customers.find(x=> x.name.toLowerCase()===name.toLowerCase()); if (!c) return hideCreditInfo(); showCreditInfoById(c.id); }
-function hideCreditInfo(){ creditInfo.style.display='none'; creditInfoName.innerText=''; creditInfoBalance.innerText='0.00'; creditHistory.innerHTML=''; }
-
-/* Pay balance */
-payBalanceBtn.addEventListener('click', function(){
-  const name = creditInput.value.trim(); if (!name) return Swal.fire('Error','Fadlan dooro ama geli magaca macaamiisha','error');
-  refreshCustomers(); const c = customers.find(x=> x.name.toLowerCase()===name.toLowerCase()); if (!c) return Swal.fire('Error','Macaamiilkan lama helin','error');
-  Swal.fire({
-    title: `Bixin balance: ${c.name}`,
-    html: `<input id="sw-amount" type="number" class="swal2-input" placeholder="Lacag (USD)" min="0.01" step="0.01"><input id="sw-pass" type="password" class="swal2-input" placeholder="Geli admin password">`,
-    showCancelButton:true, confirmButtonText:'Bixi',
-    preConfirm: () => {
-      const amount = parseFloat(document.getElementById('sw-amount').value);
-      const pass = document.getElementById('sw-pass').value;
-      if (!amount || amount <= 0) { Swal.showValidationMessage('Fadlan geli lacag sax ah'); return false; }
-      if (amount > parseFloat(c.balance)) { Swal.showValidationMessage('Lacagta way ka badan tahay balance-ka'); return false; }
-      if (!pass) { Swal.showValidationMessage('Fadlan geli password'); return false; }
-      if (pass !== ADMIN_PASS) { Swal.showValidationMessage('Password khalad ah'); return false; }
-      return { amount, pass };
-    }
-  }).then(result=>{
-    if (result.isConfirmed && result.value) {
-      const { amount } = result.value;
-      customers = load(KEY_CUSTOMERS);
-      const cc = customers.find(x=> x.id===c.id);
-      cc.balance = parseFloat((parseFloat(cc.balance) - amount).toFixed(2));
-      if (cc.balance < 0.005) cc.balance = 0;
-      save(KEY_CUSTOMERS, customers);
-      // record payment entry (as Payment) - Payment shouldn't count as sale
-      const salesLocal = load(KEY_SALES);
-      salesLocal.push({ id: uid('p'), type:'Payment', customer: cc.name, amount, date: new Date().toISOString(), lines: [], returned: false });
-      save(KEY_SALES, salesLocal);
-      showCreditInfoById(cc.id); renderReports(); updateStats();
-      Swal.fire('La bixiyey','Lacagta waa la xaqiijiyey','success');
-    }
-  });
-});
-
-/* helper: generate short invoice id */
-function genInvoice(){
-  // INV- + 4 digit random
-  const n = Math.floor(Math.random()*9000)+1000;
-  return 'INV-' + n;
-}
-
-/* SAVE SALE + Auto print A5 */
-document.getElementById('saveSaleBtn').addEventListener('click', function(){
-  if (cart.length===0) return Swal.fire('Error','Cart waa madhan','error');
-  const payment = document.getElementById('paymentType').value;
-  const custName = document.getElementById('creditName').value.trim();
-  if (payment === 'Credit' && !custName) return Swal.fire('Error','Fadlan geli magaca macaamiisha (credit)','error');
-
-  // validate stock
-  items = load(KEY_ITEMS);
-  try {
-    cart.forEach(c => {
-      const it = items.find(x=> x.id===c.id);
-      if (!it) throw new Error(`Item ${c.name} lama helin`);
-      if (c.qty > it.quantity) throw new Error(`Item '${it.name}' kaliya ${it.quantity} ayaa la heli karaa, codsatay ${c.qty}`);
-    });
-  } catch(err){ return Swal.fire('Error', err.message, 'error'); }
-
-  // compute total
-  let total = 0; cart.forEach(c => total += c.qty * parseFloat(c.price)); total = parseFloat(total.toFixed(2));
-
-  // sale entry
-  const orderId = genInvoice();
-  const sale = { id: orderId, total, payment, customer: payment==='Credit'? custName : null, date: new Date().toISOString(), lines: cart.map(c => ({...c})), returned: false };
-  sales = load(KEY_SALES); sales.push(sale); save(KEY_SALES, sales);
-
-  // decrement stock
-  items = items.map(it => { const line = cart.find(l=> l.id===it.id); if (line) return {...it, quantity: it.quantity - line.qty}; return it; });
-  save(KEY_ITEMS, items);
-
-  // handle credit customer: update balance but do NOT include in today's paid total
-  if (payment === 'Credit') {
-    customers = load(KEY_CUSTOMERS);
-    let c = customers.find(x => x.name.toLowerCase() === custName.toLowerCase());
-    if (c) c.balance = parseFloat((parseFloat(c.balance) + total).toFixed(2));
-    else { c = { id: uid('c'), name: custName, balance: total }; customers.push(c); }
-    save(KEY_CUSTOMERS, customers);
-  }
-
-  // prepare receipt content
-  const dt = new Date(sale.date || new Date().toISOString());
-  const dtStr = dt.toLocaleString();
-  let receiptHtml = `<div style="font-weight:700; font-size:16px;">Foorno Ubax Supermarket System</div>`;
-  receiptHtml += `<div style="margin-top:6px;">Order ID: <b>${orderId}</b></div>`;
-  receiptHtml += `<div>Date: ${dtStr}</div>`;
-  if (sale.customer) receiptHtml += `<div>Customer: ${escapeHtml(sale.customer)}</div>`;
-  receiptHtml += `<hr style="margin:8px 0;">`;
-  receiptHtml += `<table style="width:100%; font-size:14px;" cellpadding="4"><tbody>`;
-  sale.lines.forEach(l => {
-    receiptHtml += `<tr><td style="text-align:left">${escapeHtml(l.name)} x${l.qty}</td><td style="text-align:right">${(l.qty*parseFloat(l.price)).toFixed(2)} USD</td></tr>`;
-  });
-  receiptHtml += `</tbody></table>`;
-  receiptHtml += `<hr style="margin:8px 0;"><div style="font-weight:700; font-size:15px;">Total: ${sale.total.toFixed(2)} USD</div>`;
-  receiptHtml += `<div style="margin-top:6px;">Type: ${sale.payment}</div>`;
-  receiptHtml += `<div style="margin-top:10px; font-size:12px;">Thanks for shopping at Foorno Ubax</div>`;
-
-  // clear cart & UI
-  cart = []; renderCart(); renderSaleItemsList(); renderItemsTable(); updateStats(); showAlertIfLow();
-
-  // save and auto-print
-  document.getElementById('printContent').innerHTML = `<div class="centered">${receiptHtml}</div>`;
-  document.getElementById('printFooter').innerText = `Order ID: ${orderId} • ${dtStr}`;
-  const printArea = document.getElementById('printArea');
-  printArea.style.display = 'block';
-  setTimeout(()=>{
-    window.print();
-    printArea.style.display = 'none';
-  }, 400);
-
-  // if credit sale refresh credit info box
-  if (sale.payment === 'Credit') showCreditInfoByName(sale.customer);
-
-  Swal.fire('Saved','Iibka waa la keydiyey. Receipt waa la daabacay.','success');
-});
-
-/* REPORTS & RETURNS */
-function updateStats(){
-  items = load(KEY_ITEMS); sales = load(KEY_SALES); customers = load(KEY_CUSTOMERS); returns = load(KEY_RETURNS);
-  document.getElementById('statItems').innerText = items.length;
-  const lowCount = items.filter(i => i.quantity <= i.low).length;
-  document.getElementById('statLow').innerText = lowCount;
-  // today total: include only Paid sales, exclude Credit and exclude Payments and exclude returned
-  const today = new Date().toISOString().slice(0,10);
-  const todayTotal = (sales.filter(s => {
-    const sday = (s.date||'').slice(0,10);
-    if (sday !== today) return false;
-    if (s.returned) return false;
-    if (!s.payment) return false;
-    if (s.payment === 'Paid') return true;
-    return false; // exclude Credit and Payment types
-  }).reduce((a,b)=> a + parseFloat(b.total || 0), 0) || 0).toFixed(2);
-  document.getElementById('statToday').innerText = todayTotal;
-}
-function renderLowList(){
-  items = load(KEY_ITEMS);
-  const low = items.filter(i => i.quantity <= i.low);
-  const container = document.getElementById('lowItemsList');
-  if (low.length === 0) container.innerHTML = '<p class="text-muted">Items wanaagsan — ma jiraan wax ku dhow inay dhamaadaan.</p>';
-  else {
-    let html = '<ul class="list-group">';
-    low.forEach(i => html += `<li class="list-group-item d-flex justify-content-between">${escapeHtml(i.name)} <span class="text-danger">${i.quantity}</span></li>`);
-    html += '</ul>'; container.innerHTML = html;
-  }
-}
-function showAlertIfLow(){
-  items = load(KEY_ITEMS);
-  const low = items.filter(i => i.quantity <= i.low);
-  if (low.length > 0) {
-    const names = low.map(i => `${i.name} (${i.quantity})`).join(', ');
-    Swal.fire({ icon:'warning', title:'Stock Alert', html:`Items ku dhow inay dhammaan: <br><b>${names}</b>`, timer:8000 });
-  }
-}
-
-/* render reports */
-function renderReports(){
-  sales = load(KEY_SALES); customers = load(KEY_CUSTOMERS); returns = load(KEY_RETURNS); items = load(KEY_ITEMS);
-  // report today's total (Paid only)
-  const today = new Date().toISOString().slice(0,10);
-  const todayTotal = (sales.filter(s => {
-    const sday = (s.date||'').slice(0,10);
-    if (sday !== today) return false;
-    if (s.returned) return false;
-    if (s.payment === 'Paid') return true;
-    return false;
-  }).reduce((a,b)=> a + parseFloat(b.total || 0), 0) || 0).toFixed(2);
-  document.getElementById('reportTodayTotal').innerText = todayTotal;
-
-  // report credits
-  const rc = document.getElementById('reportCredits'); rc.innerHTML = '';
-  if (!customers || customers.length===0) rc.innerHTML = '<li class="list-group-item text-muted">Ma jiraan credit customers</li>';
-  else customers.forEach(c => rc.innerHTML += `<li class="list-group-item d-flex justify-content-between">${escapeHtml(c.name)} <span>${parseFloat(c.balance).toFixed(2)}</span></li>`);
-  // low items
-  const rl = document.getElementById('reportLow'); rl.innerHTML = '';
-  const lowList = items.filter(i => i.quantity <= i.low);
-  if (lowList.length === 0) rl.innerHTML = '<li class="list-group-item text-muted">Ma jiraan items ku dhow inay dhamaadaan</li>';
-  else lowList.forEach(i => rl.innerHTML += `<li class="list-group-item d-flex justify-content-between">${escapeHtml(i.name)} <span>${i.quantity}</span></li>`);
-
-  // sales list
-  const st = document.getElementById('salesTable'); st.innerHTML = '';
-  (sales || []).slice().reverse().forEach(s => {
-    const dt = s.date ? new Date(s.date).toLocaleString() : '';
-    st.innerHTML += `<tr class="${s.returned ? 'table-warning' : ''}"><td>${escapeHtml(s.id)}</td><td>${dt}</td><td>${parseFloat(s.total||0).toFixed(2)}</td><td>${escapeHtml(s.payment||s.type||'')}</td></tr>`;
-  });
-
-  // returns list
-  const rlContainer = document.getElementById('returnList'); rlContainer.innerHTML = '';
-  if (!returns || returns.length===0) rlContainer.innerHTML = '<p class="text-muted">Ma jiraan returns la diiwaangeliyey.</p>';
-  else {
-    let html = '<ul class="list-group">';
-    returns.slice().reverse().forEach(r => {
-      const dt = r.date ? new Date(r.date).toLocaleString() : '';
-      html += `<li class="list-group-item d-flex justify-content-between"><div><b>${escapeHtml(r.orderId)}</b> — ${dt}<br><small>${escapeHtml(r.note||'')}</small></div><div><span class="text-success">Returned</span></div></li>`;
-    });
-    html += '</ul>'; rlContainer.innerHTML = html;
-  }
-}
-
-/* process return: single sale return (user requested single-item or full order?). User selected earlier => full order return */
-document.getElementById('doReturnBtn').addEventListener('click', function(){
-  const id = document.getElementById('returnId').value.trim();
-  if (!id) return Swal.fire('Error','Fadlan geli Order ID','error');
-  sales = load(KEY_SALES);
-  const saleIndex = sales.findIndex(s => s.id === id);
-  if (saleIndex === -1) return Swal.fire('Error','Order ID lama helin','error');
-  const sale = sales[saleIndex];
-  if (sale.returned) return Swal.fire('Info','Iibkan hore ayaa loo celiyey','info');
-  const saleDate = new Date(sale.date);
-  const now = new Date();
-  const diffMs = now - saleDate;
-  const diffHours = diffMs / (1000*60*60);
-  if (diffHours > 24) return Swal.fire('Diid','⚠️ Waqtiga celinta wuu dhammaaday (24 saac)','error');
-
-  // restore stock quantities (full order return)
-  items = load(KEY_ITEMS);
-  sale.lines.forEach(line => {
-    const it = items.find(x=> x.id === line.id);
-    if (it) it.quantity = parseInt(it.quantity) + parseInt(line.qty);
-  });
-  save(KEY_ITEMS, items);
-
-  // mark sale returned
-  sales[saleIndex].returned = true;
-  save(KEY_SALES, sales);
-
-  // register return entry
-  returns = load(KEY_RETURNS) || [];
-  returns.push({ id: uid('r'), orderId: sale.id, date: new Date().toISOString(), note: 'Returned within 24 hours' });
-  save(KEY_RETURNS, returns);
-
-  // update customers balance if credit
-  if (sale.payment === 'Credit' && sale.customer) {
-    customers = load(KEY_CUSTOMERS);
-    const c = customers.find(x=> x.name.toLowerCase() === sale.customer.toLowerCase());
-    if (c) {
-      c.balance = parseFloat((parseFloat(c.balance) - parseFloat(sale.total)).toFixed(2));
-      if (c.balance < 0.005) c.balance = 0;
-      save(KEY_CUSTOMERS, customers);
-    }
-  }
-
-  renderItemsTable(); renderSaleItemsList(); updateStats(); renderReports();
-  Swal.fire('La xaqiijiyey','Return waa la sameeyey. Stock & records waa la cusbooneysiiyey','success');
-});
-
-/* initial renders */
-renderItemsTable(); renderSaleItemsList(); updateStats(); renderReports();
-if (sessionStorage.getItem('foorno_ubax_logged')) go('dashboard'); else hideAllViews();
-
-/* Minimal export/import backup (kept simple) */
-function exportData(){
-  const data = { items: load(KEY_ITEMS), sales: load(KEY_SALES), customers: load(KEY_CUSTOMERS), returns: load(KEY_RETURNS) };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'foorno_ubax_backup_v3.json'; a.click();
-  URL.revokeObjectURL(url);
-}
-function importData(json){
-  try {
-    const d = JSON.parse(json);
-    if (d.items) save(KEY_ITEMS, d.items);
-    if (d.sales) save(KEY_SALES, d.sales);
-    if (d.customers) save(KEY_CUSTOMERS, d.customers);
-    if (d.returns) save(KEY_RETURNS, d.returns);
-    items = load(KEY_ITEMS); sales = load(KEY_SALES); customers = load(KEY_CUSTOMERS); returns = load(KEY_RETURNS);
-    renderItemsTable(); renderSaleItemsList(); updateStats(); renderReports();
-    Swal.fire('Imported','Data waa la soo dejiyey','success');
-  } catch(e) { Swal.fire('Error','Import failed: invalid file','error'); }
-}
-
-/* helpers to hide suggestions when clicking outside */
-document.addEventListener('click', function(e){
-  if (!e.target.closest('.suggestions') && !e.target.closest('#saleSearch')) hideSuggest();
-  if (!e.target.closest('.suggestions') && !e.target.closest('#creditName')) hideCreditSuggest();
-});
-</script>
-</body>
-</html>
+  if (!q) {
